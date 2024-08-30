@@ -41,25 +41,17 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
                                         encoding_format="png",
                                         doc="Main camera RGB observation.",
                                     ),
-                                    "wrist_image": tfds.features.Image(
-                                        shape=(64, 64, 3),
-                                        dtype=np.uint8,
-                                        encoding_format="png",
-                                        doc="Wrist camera RGB observation.",
-                                    ),
                                     "state": tfds.features.Tensor(
-                                        shape=(10,),
+                                        shape=(2,),
                                         dtype=np.float32,
-                                        doc="Robot state, consists of [7x robot joint angles, "
-                                        "2x gripper position, 1x door opening angle].",
+                                        doc="Robot current location state, in (x, y) coordinates",
                                     ),
                                 }
                             ),
                             "action": tfds.features.Tensor(
-                                shape=(10,),
+                                shape=(2,),
                                 dtype=np.float32,
-                                doc="Robot action, consists of [7x joint velocities, "
-                                "2x gripper velocities, 1x terminate episode].",
+                                doc="Robot movement action, in (x, y) coordinates",
                             ),
                             "discount": tfds.features.Scalar(
                                 dtype=np.float32,

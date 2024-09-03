@@ -19,6 +19,11 @@ from process_data.data.data_utils import (
     to_local_coords,
 )
 
+CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
+ENCODER_PATH = (
+    "/home/yufeng/.cache/tfhub_modules/google/universal-sentence-encoder-large/5"
+)
+
 
 class SacsonDataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
@@ -35,21 +40,22 @@ class SacsonDataset(tfds.core.GeneratorBasedBuilder):
         # 1) manual download "https://hub.tensorflow.google.cn/google/universal-sentence-encoder-large/5"
         # 2) unzip and move to the tfhub cache folder
         # 3) load model directly from the cache folder by passing the path to hub.load
-        self._embed = hub.load(
-            "/home/yufeng/.cache/tfhub_modules/google/universal-sentence-encoder-large/5"
-        )
+        self._embed = hub.load(ENCODER_PATH)
 
-        with open("/home/yufeng/rlds_dataset_builder/config/nomad.yaml", "r") as f:
+        with open(CONFIG_FILE_PATH, "r") as f:
             config = yaml.safe_load(f)
 
         self.dataset_name = "sacson"
-        self.data_config = config["datasets"][self.dataset_name]
-        if "end_slack" not in self.data_config:
-            self.data_config["end_slack"] = 0
-        if "waypoint_spacing" not in self.data_config:
-            self.data_config["waypoint_spacing"] = 1
+        data_config = config["datasets"][self.dataset_name]
+        self.data_folder = data_config["data_folder"]
+        self.train_split_folder = data_config["train"]
+        self.test_split_folder = data_config["test"]
 
-        self.end_slack = self.data_config["end_slack"]
+        self.end_slack = data_config["end_slack"] if "end_slack" in data_config else 0
+        self.waypoint_spacing = (
+            data_config["waypoint_spacing"] if "waypoint_spacing" in data_config else 1
+        )
+
         self.image_size = config["image_size"]
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -65,7 +71,8 @@ class SacsonDataset(tfds.core.GeneratorBasedBuilder):
                                         shape=(96, 96, 3),
                                         dtype=np.uint8,
                                         encoding_format="png",
-                                        doc="Main camera RGB observation.",
+                                        doc="Main camera RGB observation."
+                                        "Cropped to size 96x96x3, same as in nomad.",
                                     ),
                                     "state": tfds.features.Tensor(
                                         shape=(2,),
@@ -130,10 +137,10 @@ class SacsonDataset(tfds.core.GeneratorBasedBuilder):
         """Generator of examples for each split."""
 
         def _parse_trajectory(traj_name):
-            traj_folder = os.path.join(data_folder, traj_name)
+            traj_folder = os.path.join(self.data_folder, traj_name)
             with open(os.path.join(traj_folder, "traj_data.pkl"), "rb") as f:
                 traj_data = pickle.load(f)
-            traj_len = len(traj_data["position"]) - self.data_config["end_slack"]
+            traj_len = len(traj_data["position"]) - self.end_slack
 
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
@@ -185,8 +192,9 @@ class SacsonDataset(tfds.core.GeneratorBasedBuilder):
             # if you want to skip an example for whatever reason, simply return None
             return traj_folder, sample
 
-        data_folder = self.data_config["data_folder"]
-        data_split_folder = self.data_config[split]
+        data_split_folder = (
+            self.train_split_folder if split == "train" else self.test_split_folder
+        )
 
         traj_names_file = os.path.join(data_split_folder, "traj_names.txt")
         with open(traj_names_file, "r") as f:

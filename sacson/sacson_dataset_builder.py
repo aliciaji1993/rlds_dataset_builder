@@ -12,7 +12,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
-from data.data_utils import (
+from process_data.data.data_utils import (
     img_path_to_data,
     calculate_sin_cos,
     get_data_path,

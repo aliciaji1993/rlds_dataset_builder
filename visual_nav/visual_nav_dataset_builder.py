@@ -1,10 +1,23 @@
+import argparse
+import cv2
+import numpy as np
+import os
+import pickle
+import tqdm
+import yaml
+
 from typing import Iterator, Tuple, Any
 
-import glob
-import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
+
+from data.data_utils import (
+    img_path_to_data,
+    calculate_sin_cos,
+    get_data_path,
+    to_local_coords,
+)
 
 
 class VisualNav(tfds.core.GeneratorBasedBuilder):
@@ -26,6 +39,19 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
             "/home/yufeng/.cache/tfhub_modules/google/universal-sentence-encoder-large/5"
         )
 
+        with open("config/visual_nav.yaml", "r") as f:
+            config = yaml.safe_load(f)
+
+        self.dataset_name = "sacson"
+        self.data_config = config["datasets"][self.dataset_name]
+        if "end_slack" not in self.data_config:
+            self.data_config["end_slack"] = 0
+        if "waypoint_spacing" not in self.data_config:
+            self.data_config["waypoint_spacing"] = 1
+
+        self.end_slack = self.data_config["end_slack"]
+        self.image_size = config["image_size"]
+
     def _info(self) -> tfds.core.DatasetInfo:
         """Dataset metadata (homepage, citation,...)."""
         return self.dataset_info_from_configs(
@@ -36,7 +62,7 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
                             "observation": tfds.features.FeaturesDict(
                                 {
                                     "image": tfds.features.Image(
-                                        shape=(64, 64, 3),
+                                        shape=(96, 96, 3),
                                         dtype=np.uint8,
                                         encoding_format="png",
                                         doc="Main camera RGB observation.",
@@ -84,7 +110,7 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
                     ),
                     "episode_metadata": tfds.features.FeaturesDict(
                         {
-                            "file_path": tfds.features.Text(
+                            "traj_folder": tfds.features.Text(
                                 doc="Path to the original data file."
                             ),
                         }
@@ -96,61 +122,83 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
         return {
-            "train": self._generate_examples(path="data/train/episode_*.npy"),
-            "val": self._generate_examples(path="data/val/episode_*.npy"),
+            "train": self._generate_examples(split="train"),
+            "val": self._generate_examples(split="test"),
         }
 
-    def _generate_examples(self, path) -> Iterator[Tuple[str, Any]]:
+    def _generate_examples(self, split) -> Iterator[Tuple[str, Any]]:
         """Generator of examples for each split."""
 
-        def _parse_example(episode_path):
-            # load raw data --> this should change for your dataset
-            data = np.load(
-                episode_path, allow_pickle=True
-            )  # this is a list of dicts in our case
+        def _parse_trajectory(traj_name):
+            traj_folder = os.path.join(data_folder, traj_name)
+            with open(os.path.join(traj_folder, "traj_data.pkl"), "rb") as f:
+                traj_data = pickle.load(f)
+            traj_len = len(traj_data["position"]) - self.data_config["end_slack"]
 
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
-            for i, step in enumerate(data):
+            for i in range(0, traj_len):
                 # compute Kona language embedding
-                language_embedding = self._embed([step["language_instruction"]])[
-                    0
-                ].numpy()
+                language_instruction = "Where can the robot go?"
+                language_embedding = self._embed([language_instruction])[0].numpy()
+
+                # load image
+                image_path = traj_folder + f"/{i}.jpg"
+                # with open(image_path, "rb") as f:
+                image = img_path_to_data(image_path, self.image_size)
+
+                # compute relative (x, y) corrdinates of next pos w.r.t current pos
+                position = traj_data["position"][i].astype(np.float32)
+                action = to_local_coords(
+                    traj_data["position"][i + 1],
+                    traj_data["position"][i],
+                    traj_data["yaw"][i],
+                )
 
                 episode.append(
                     {
                         "observation": {
-                            "image": step["image"],
-                            "wrist_image": step["wrist_image"],
-                            "state": step["state"],
+                            "image": image,
+                            "state": position,
                         },
-                        "action": step["action"],
+                        "action": action,
                         "discount": 1.0,
-                        "reward": float(i == (len(data) - 1)),
+                        "reward": float(i == (traj_len - 1)),
                         "is_first": i == 0,
-                        "is_last": i == (len(data) - 1),
-                        "is_terminal": i == (len(data) - 1),
-                        "language_instruction": step["language_instruction"],
+                        "is_last": i == (traj_len - 1),
+                        "is_terminal": i == (traj_len - 1),
+                        "language_instruction": language_instruction,
                         "language_embedding": language_embedding,
                     }
                 )
 
+                if False:
+                    info = f"state: {position}, action: {action}"
+                    cv2.imshow(info, image)
+
             # create output data sample
-            sample = {"steps": episode, "episode_metadata": {"file_path": episode_path}}
+            sample = {
+                "steps": episode,
+                "episode_metadata": {"traj_folder": traj_folder},
+            }
 
             # if you want to skip an example for whatever reason, simply return None
-            return episode_path, sample
+            return traj_folder, sample
 
-        # create list of all examples
-        episode_paths = glob.glob(path)
+        data_folder = self.data_config["data_folder"]
+        data_split_folder = self.data_config[split]
+
+        traj_names_file = os.path.join(data_split_folder, "traj_names.txt")
+        with open(traj_names_file, "r") as f:
+            file_lines = f.read()
+            traj_names = file_lines.split("\n")
+        if "" in traj_names:
+            traj_names.remove("")
 
         # for smallish datasets, use single-thread parsing
-        for sample in episode_paths:
-            yield _parse_example(sample)
+        for traj_name in tqdm.tqdm(traj_names, disable=True, dynamic_ncols=True):
+            yield _parse_trajectory(traj_name)
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
         # beam = tfds.core.lazy_imports.apache_beam
-        # return (
-        #         beam.Create(episode_paths)
-        #         | beam.Map(_parse_example)
-        # )
+        # return beam.Create(traj_names) | beam.Map(_parse_trajectory)

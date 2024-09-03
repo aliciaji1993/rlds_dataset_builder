@@ -1,3 +1,3 @@
 from setuptools import setup
 
-setup(name="VisualNav", packages=["visual_nav"])
+setup(name="sacson", packages=["sacson"])

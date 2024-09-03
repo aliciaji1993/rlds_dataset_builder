@@ -20,7 +20,7 @@ from data.data_utils import (
 )
 
 
-class VisualNav(tfds.core.GeneratorBasedBuilder):
+class SacsonDataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version("1.0.0")
@@ -39,7 +39,7 @@ class VisualNav(tfds.core.GeneratorBasedBuilder):
             "/home/yufeng/.cache/tfhub_modules/google/universal-sentence-encoder-large/5"
         )
 
-        with open("config/visual_nav.yaml", "r") as f:
+        with open("/home/yufeng/rlds_dataset_builder/config/nomad.yaml", "r") as f:
             config = yaml.safe_load(f)
 
         self.dataset_name = "sacson"

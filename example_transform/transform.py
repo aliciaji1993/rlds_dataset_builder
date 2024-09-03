@@ -15,13 +15,16 @@ from PIL import Image
 #                 encoding_format='jpeg',
 #                 doc='Main camera RGB observation.',
 #             ),
+#             'state': tfds.features.Tensor(
+#                 shape=(2,),
+#                 dtype=np.float32,
+#                 doc='Robot current location state, in (x, y) coordinates',
+#             ),
 #         }),
 #         'action': tfds.features.Tensor(
-#             shape=(8,),
+#             shape=(2,),
 #             dtype=np.float32,
-#             doc='Robot action, consists of [3x EEF position, '
-#                 '3x EEF orientation yaw/pitch/roll, 1x gripper open/close position, '
-#                 '1x terminate episode].',
+#             doc='Robot movement action, in (x, y) coordinates",
 #         ),
 #         'discount': tfds.features.Scalar(
 #             dtype=np.float32,
@@ -60,21 +63,27 @@ from PIL import Image
 
 def transform_step(step: Dict[str, Any]) -> Dict[str, Any]:
     """Maps step from source dataset to target dataset config.
-       Input is dict of numpy arrays."""
-    img = Image.fromarray(step['observation']['image']).resize(
-        (128, 128), Image.Resampling.LANCZOS)
+    Input is dict of numpy arrays."""
+    img = Image.fromarray(step["observation"]["image"]).resize(
+        (128, 128), Image.Resampling.LANCZOS
+    )
+    state = step["observation"]["state"]
+    action = step["action"]
     transformed_step = {
-        'observation': {
-            'image': np.array(img),
-        },
-        'action': np.concatenate(
-            [step['action'][:3], step['action'][5:8], step['action'][-2:]]),
+        "observation": {"image": np.array(img), "state": np.array(state)},
+        "action": np.array(action),
     }
 
     # copy over all other fields unchanged
-    for copy_key in ['discount', 'reward', 'is_first', 'is_last', 'is_terminal',
-                     'language_instruction', 'language_embedding']:
+    for copy_key in [
+        "discount",
+        "reward",
+        "is_first",
+        "is_last",
+        "is_terminal",
+        "language_instruction",
+        "language_embedding",
+    ]:
         transformed_step[copy_key] = step[copy_key]
 
     return transformed_step
-

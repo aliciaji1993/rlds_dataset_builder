@@ -25,7 +25,7 @@ ENCODER_PATH = (
 )
 
 
-class SacsonDataset(tfds.core.GeneratorBasedBuilder):
+class Sacson(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version("1.0.0")
@@ -178,10 +178,6 @@ class SacsonDataset(tfds.core.GeneratorBasedBuilder):
                         "language_embedding": language_embedding,
                     }
                 )
-
-                if False:
-                    info = f"state: {position}, action: {action}"
-                    cv2.imshow(info, image)
 
             # create output data sample
             sample = {

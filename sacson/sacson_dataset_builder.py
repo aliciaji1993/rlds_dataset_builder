@@ -1,8 +1,7 @@
 import argparse
-import cv2
+import glob
 import numpy as np
 import os
-import pickle
 import tqdm
 import yaml
 
@@ -12,12 +11,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
-from process_data.data.data_utils import (
-    img_path_to_data,
-    calculate_sin_cos,
-    get_data_path,
-    to_local_coords,
-)
+from trajectory_parser import parse_trajectory
 
 CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
 ENCODER_PATH = (
@@ -28,9 +22,10 @@ ENCODER_PATH = (
 class Sacson(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
-    VERSION = tfds.core.Version("1.0.0")
+    VERSION = tfds.core.Version("2.0.0")
     RELEASE_NOTES = {
         "1.0.0": "Initial release.",
+        "2.0.0": "Actions predicting 8 future positions",
     }
 
     def __init__(self, *args, **kwargs):
@@ -45,18 +40,17 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
         with open(CONFIG_FILE_PATH, "r") as f:
             config = yaml.safe_load(f)
 
-        self.dataset_name = "sacson"
-        data_config = config["datasets"][self.dataset_name]
+        data_config = config["datasets"]["sacson"]
         self.data_folder = data_config["data_folder"]
-        self.train_split_folder = data_config["train"]
-        self.test_split_folder = data_config["test"]
+        self.train_folder = data_config["train"]
+        self.test_folder = data_config["test"]
 
         self.end_slack = data_config["end_slack"] if "end_slack" in data_config else 0
         self.waypoint_spacing = (
             data_config["waypoint_spacing"] if "waypoint_spacing" in data_config else 1
         )
-
         self.image_size = config["image_size"]
+        self.len_traj_pred = 8
 
     def _info(self) -> tfds.core.DatasetInfo:
         """Dataset metadata (homepage, citation,...)."""
@@ -75,16 +69,16 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
                                         "Cropped to size 96x96x3, same as in nomad.",
                                     ),
                                     "state": tfds.features.Tensor(
-                                        shape=(2,),
+                                        shape=(3,),
                                         dtype=np.float32,
-                                        doc="Robot current location state, in (x, y) coordinates",
+                                        doc="Robot current absolute state (x, y, yaw)",
                                     ),
                                 }
                             ),
                             "action": tfds.features.Tensor(
-                                shape=(2,),
+                                shape=(8, 2),
                                 dtype=np.float32,
-                                doc="Robot movement action, in (x, y) coordinates",
+                                doc="Robot movement action, in current (x, y) coordinates",
                             ),
                             "discount": tfds.features.Scalar(
                                 dtype=np.float32,
@@ -136,44 +130,37 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
     def _generate_examples(self, split) -> Iterator[Tuple[str, Any]]:
         """Generator of examples for each split."""
 
-        def _parse_trajectory(traj_name):
-            traj_folder = os.path.join(self.data_folder, traj_name)
-            with open(os.path.join(traj_folder, "traj_data.pkl"), "rb") as f:
-                traj_data = pickle.load(f)
-            traj_len = len(traj_data["position"]) - self.end_slack
+        # compute language embedding
+        language_instruction = "continue the trajectory"
+        language_embedding = self._embed([language_instruction])[0].numpy()
+
+        def _parse_trajectory(traj_folder):
+            steps = parse_trajectory(
+                traj_folder=traj_folder,
+                image_size=self.image_size,
+                len_traj_pred=self.len_traj_pred,
+                end_slack=self.end_slack,
+            )
+
+            if len(steps) == 0:
+                print("Cannot parse enough steps from trajectory:", traj_folder)
+                return None
 
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
-            for i in range(0, traj_len):
-                # compute Kona language embedding
-                language_instruction = "Where can the robot go?"
-                language_embedding = self._embed([language_instruction])[0].numpy()
-
-                # load image
-                image_path = traj_folder + f"/{i}.jpg"
-                # with open(image_path, "rb") as f:
-                image = img_path_to_data(image_path, self.image_size)
-
-                # compute relative (x, y) corrdinates of next pos w.r.t current pos
-                position = traj_data["position"][i].astype(np.float32)
-                action = to_local_coords(
-                    traj_data["position"][i + 1],
-                    traj_data["position"][i],
-                    traj_data["yaw"][i],
-                )
-
+            for i, step in enumerate(steps):
                 episode.append(
                     {
                         "observation": {
-                            "image": image,
-                            "state": position,
+                            "image": step["image"],
+                            "state": step["state"].astype(np.float32),
                         },
-                        "action": action,
+                        "action": step["action"],
                         "discount": 1.0,
-                        "reward": float(i == (traj_len - 1)),
+                        "reward": float(i == (len(steps) - 1)),
                         "is_first": i == 0,
-                        "is_last": i == (traj_len - 1),
-                        "is_terminal": i == (traj_len - 1),
+                        "is_last": i == (len(steps) - 1),
+                        "is_terminal": i == (len(steps) - 1),
                         "language_instruction": language_instruction,
                         "language_embedding": language_embedding,
                     }
@@ -188,21 +175,40 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
             # if you want to skip an example for whatever reason, simply return None
             return traj_folder, sample
 
-        data_split_folder = (
-            self.train_split_folder if split == "train" else self.test_split_folder
-        )
+        split_folder = self.train_folder if split == "train" else self.test_folder
 
-        traj_names_file = os.path.join(data_split_folder, "traj_names.txt")
+        traj_names_file = os.path.join(split_folder, "traj_names.txt")
         with open(traj_names_file, "r") as f:
             file_lines = f.read()
             traj_names = file_lines.split("\n")
-        if "" in traj_names:
-            traj_names.remove("")
+
+        # filter invalid trajectories
+        def validate_trajectory(traj_name):
+            if not traj_name:
+                return False
+            # check if trajectory folder exists
+            traj_folder = os.path.join(self.data_folder, traj_name)
+            if not os.path.exists(traj_folder):
+                print(f"Skipping non-existing trajectory {traj_name}...")
+                return False
+            # check if trajectory contains enough steps
+            traj_len = len(glob.glob(os.path.join(traj_folder, "*.jpg")))
+            if traj_len <= self.end_slack + self.len_traj_pred:
+                print(f"Skipping short trajectory {traj_name} of length {traj_len}...")
+                return False
+            return True
+
+        traj_names = filter(validate_trajectory, traj_names)
+
+        print(traj_names)
+        traj_folders = [
+            os.path.join(self.data_folder, traj_name) for traj_name in traj_names
+        ]
 
         # for smallish datasets, use single-thread parsing
-        for traj_name in tqdm.tqdm(traj_names, disable=True, dynamic_ncols=True):
-            yield _parse_trajectory(traj_name)
+        # for traj_folder in tqdm.tqdm(traj_folders, disable=True, dynamic_ncols=True):
+        #     yield _parse_trajectory(traj_folder)
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
-        # beam = tfds.core.lazy_imports.apache_beam
-        # return beam.Create(traj_names) | beam.Map(_parse_trajectory)
+        beam = tfds.core.lazy_imports.apache_beam
+        return beam.Create(traj_folders) | beam.Map(_parse_trajectory)

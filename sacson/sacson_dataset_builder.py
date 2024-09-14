@@ -142,10 +142,6 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
                 end_slack=self.end_slack,
             )
 
-            if len(steps) == 0:
-                print("Cannot parse enough steps from trajectory:", traj_folder)
-                return None
-
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
             for i, step in enumerate(steps):
@@ -181,34 +177,32 @@ class Sacson(tfds.core.GeneratorBasedBuilder):
         with open(traj_names_file, "r") as f:
             file_lines = f.read()
             traj_names = file_lines.split("\n")
+        traj_names.remove("")
 
         # filter invalid trajectories
-        def validate_trajectory(traj_name):
-            if not traj_name:
-                return False
-            # check if trajectory folder exists
-            traj_folder = os.path.join(self.data_folder, traj_name)
-            if not os.path.exists(traj_folder):
-                print(f"Skipping non-existing trajectory {traj_name}...")
-                return False
-            # check if trajectory contains enough steps
-            traj_len = len(glob.glob(os.path.join(traj_folder, "*.jpg")))
-            if traj_len <= self.end_slack + self.len_traj_pred:
-                print(f"Skipping short trajectory {traj_name} of length {traj_len}...")
-                return False
-            return True
+        # def validate_trajectory(traj_name):
+        #     if not traj_name:
+        #         return False
+        #     # check if trajectory folder exists
+        #     traj_folder = os.path.join(self.data_folder, traj_name)
+        #     if not os.path.exists(traj_folder):
+        #         print(f"Skipping non-existing trajectory {traj_name}...")
+        #         return False
+        #     # check if trajectory contains enough steps
+        #     traj_len = len(glob.glob(os.path.join(traj_folder, "*.jpg")))
+        #     if traj_len <= self.end_slack + self.len_traj_pred:
+        #         print(f"Skipping short trajectory {traj_name} of length {traj_len}...")
+        #         return False
+        #     return True
 
-        traj_names = filter(validate_trajectory, traj_names)
+        # traj_names = filter(validate_trajectory, traj_names)
 
-        print(traj_names)
-        traj_folders = [
-            os.path.join(self.data_folder, traj_name) for traj_name in traj_names
-        ]
+        traj_folders = [os.path.join(self.data_folder, name) for name in traj_names]
 
         # for smallish datasets, use single-thread parsing
-        # for traj_folder in tqdm.tqdm(traj_folders, disable=True, dynamic_ncols=True):
-        #     yield _parse_trajectory(traj_folder)
+        for traj_folder in tqdm.tqdm(traj_folders, disable=True, dynamic_ncols=True):
+            yield _parse_trajectory(traj_folder)
 
         # for large datasets use beam to parallelize data parsing (this will have initialization overhead)
-        beam = tfds.core.lazy_imports.apache_beam
-        return beam.Create(traj_folders) | beam.Map(_parse_trajectory)
+        # beam = tfds.core.lazy_imports.apache_beam
+        # return beam.Create(traj_folders) | beam.Map(_parse_trajectory)

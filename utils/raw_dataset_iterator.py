@@ -4,7 +4,7 @@ import cv2
 import os
 import yaml
 
-from trajectory_parser import parse_trajectory
+from sacson.trajectory_parser import parse_trajectory
 
 CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
 

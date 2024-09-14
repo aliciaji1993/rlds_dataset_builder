@@ -5,10 +5,12 @@ import io
 import glob
 import os
 
+import matplotlib.pyplot as plt
+
 OUTPUT_ROOT = "./output"
 
 # load tensorflow dataset
-dataset_folder = "/media/yufeng/tensorflow_datasets/sacson/1.0.0"
+dataset_folder = "/media/yufeng/tensorflow_datasets/sacson/2.0.0"
 tfrecords = glob.glob(f"{dataset_folder}/*.tfrecord*")
 raw_dataset = tf.data.TFRecordDataset(tfrecords[0])
 
@@ -28,9 +30,9 @@ for i, raw_record in enumerate(raw_dataset.as_numpy_iterator()):
 
     # create output directory
     traj_name = traj_folder.split("/")[-1]
-    output_dir = os.path.join(OUTPUT_ROOT, traj_name)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    traj_dir = os.path.join(OUTPUT_ROOT, traj_name)
+    if not os.path.exists(traj_dir):
+        os.makedirs(traj_dir)
 
     # get images list
     images = example.features.feature.get("steps/observation/image").bytes_list.value
@@ -42,19 +44,31 @@ for i, raw_record in enumerate(raw_dataset.as_numpy_iterator()):
 
     # get actions list
     actions = example.features.feature.get("steps/action").float_list.value
-    actions = np.asarray(actions).reshape(-1, 2)
+    actions = np.asarray(actions).reshape(-1, 8, 2)
+    lim = np.max(np.abs(actions))
 
     # length of actions and images should be the same
     assert actions.shape[0] == len(images)
 
-    # get first observation image
+    # traverse through each step
     for j in range(len(images)):
         image_bytes_stream = io.BytesIO(images[j])
         image = PIL.Image.open(image_bytes_stream)
         # convert to numpy and inspect image size
         image_array = np.asarray(image)
         assert image_array.shape == (96, 96, 3)
-        # save to local path for later inspection
-        image.save(os.path.join(output_dir, f"step_{j}_action_{actions[j]}.jpeg"))
+
+        # save obs image to local path
+        image.save(os.path.join(traj_dir, f"step_{j}.jpg"))
+
+        # save action trajectory as image
+        _, ax = plt.subplots()
+        ax.plot(actions[j, :, 0], actions[j, :, 1], "bo")  # 'bo' means blue circles
+        ax.plot(actions[j, :, 0], actions[j, :, 1], "b-")  # 'b-' means blue solid line
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        plt.savefig(os.path.join(traj_dir, f"step_{j}_actions.jpg"), dpi=300)
+        plt.close()
+
 
 print(f"{num_empty} empty records empty out of total {i} records")

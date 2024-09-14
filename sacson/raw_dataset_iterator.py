@@ -40,8 +40,8 @@ def main():
         traj_folder = os.path.join(data_folder, traj_name)
         steps = parse_trajectory(
             traj_folder=traj_folder,
-            num_actions=8,
             image_size=image_size,
+            len_traj_pred=8,
             end_slack=end_slack,
         )
         if not steps:

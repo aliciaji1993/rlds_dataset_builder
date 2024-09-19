@@ -11,7 +11,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
-from trajectory_parser import parse_trajectory
+from process_data.trajectory_parser import parse_trajectory
 
 CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
 ENCODER_PATH = (

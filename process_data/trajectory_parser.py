@@ -21,8 +21,8 @@ def parse_trajectory(traj_folder, image_size, len_traj_pred, end_slack):
         # load position and yaw
         start_index = i
         end_index = i + len_traj_pred + 1
-        yaws = traj_data["yaw"][start_index:end_index]
-        positions = traj_data["position"][start_index:end_index]
+        yaws = traj_data["yaw"][start_index:end_index].astype(np.float32)
+        positions = traj_data["position"][start_index:end_index].astype(np.float32)
 
         # compute relative (x, y) coordinates of next n positions in current position
         waypoints = to_local_coords(positions, positions[0], yaws[0])

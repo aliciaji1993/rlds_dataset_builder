@@ -13,7 +13,7 @@ import tensorflow_hub as hub
 
 from process_data.process_data.parse_traj import parse_trajectory
 
-CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
+CONFIG_FILE_PATH = "./process_data/config/dataset_config.yaml"
 ENCODER_PATH = (
     "/home/yufeng/.cache/tfhub_modules/google/universal-sentence-encoder-large/5"
 )

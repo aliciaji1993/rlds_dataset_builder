@@ -7,9 +7,9 @@ from enum import IntEnum
 from openai import OpenAI
 from pathlib import Path
 
-from .instruct.generate import InstructType, generate_instruction
-from .instruct.template import INTRODUCTION, INSTRUCTION_TEMPLATE
-from process_data.process_data.parse_traj import parse_trajectory
+from .instruct_gen.generate import InstructType, generate_instruction
+from .instruct_gen.template import INTRODUCTION, INSTRUCTION_TEMPLATE
+from process_data.data_convert import parse_trajectory
 
 
 class EvalType(IntEnum):

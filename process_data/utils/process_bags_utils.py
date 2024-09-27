@@ -40,8 +40,7 @@ def process_locobot_img(msg) -> Image:
     """
     Process image data from a topic that publishes sensor_msgs/Image to a PIL image for the locobot dataset
     """
-    img = np.frombuffer(msg.data, dtype=np.uint8).reshape(
-        msg.height, msg.width, -1)
+    img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
     pil_image = Image.fromarray(img)
     return pil_image
 
@@ -63,6 +62,7 @@ def process_scand_img(msg) -> Image:
 
 
 ############## Add custom image processing functions here #############
+
 
 def process_sacson_img(msg) -> Image:
     np_arr = np.fromstring(msg.data, np.uint8)

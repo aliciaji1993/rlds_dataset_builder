@@ -4,7 +4,7 @@ import numpy as np
 
 from pathlib import Path
 
-from process_data.data.data_utils import img_path_to_data, to_local_coords
+from .data_utils import img_path_to_data, to_local_coords
 
 
 def parse_trajectory(traj_folder, image_size, len_traj_pred, end_slack):

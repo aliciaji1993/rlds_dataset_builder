@@ -1,4 +1,3 @@
-
 import os
 import pickle
 from PIL import Image
@@ -9,7 +8,7 @@ import yaml
 import rosbag
 
 # utils
-from vint_train.process_data.process_data_utils import *
+from process_data.utils.process_bags_utils import *
 
 
 def main(args: argparse.Namespace):
@@ -54,7 +53,6 @@ def main(args: argparse.Namespace):
             ang_offset=config[args.dataset_name]["ang_offset"],
         )
 
-  
         if bag_img_data is None or bag_traj_data is None:
             print(
                 f"{bag_path} did not have the topics we were looking for. Skipping..."

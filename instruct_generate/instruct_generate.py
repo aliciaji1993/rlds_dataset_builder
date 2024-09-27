@@ -1,26 +1,16 @@
 import base64
-import draccus
 import itertools
 import io
 import numpy as np
 import random
-import shutil
 
-from dataclasses import dataclass
 from enum import IntEnum
+
 from openai import OpenAI
 from pathlib import Path
 from PIL import Image
 
 import matplotlib.pyplot as plt
-
-from process_data.trajectory_parser import parse_trajectory
-
-
-class EvalType(IntEnum):
-    SINGLE_TRAJ = 0  # all steps in specified traj (use defaulf if not provided)
-    SINGLE_SPLIT = 1  # all steps from specified data split (default to test)
-    ENTIRE_DATASET = 2  # entire dataset
 
 
 class InstructType(IntEnum):
@@ -28,28 +18,6 @@ class InstructType(IntEnum):
     MAIN_DIRECTIONS_4 = 1
     MAIN_DIRECTIONS_8 = 2
     FORMATTED_ACTIONS = 3
-
-
-@dataclass
-class EvalConfig:
-    # eval settings
-    instruction_type: InstructType = InstructType.MAIN_DIRECTIONS_4
-    eval_type: EvalType = EvalType.ENTIRE_DATASET
-    eval_split: str = "test"
-
-    # ground truth data directory, trajectory name & step for eval
-    data_split_dir = Path("/media/yufeng/nomad_dataset/data_splits/sacson/")
-    data_root_dir = Path("/media/yufeng/nomad_dataset/sacson")
-    traj_name: str = "Dec-12-2022-bww8_00000034_1"
-    step: int = 0
-    window_size: int = 1
-
-    # output settings
-    output_root_dir = Path("/media/yufeng/openvla/instruct")
-    image_size = [96, 96]
-    end_slack: int = 3
-    len_traj_pred: int = 8
-    sample_rate: float = 1.0
 
 
 INTRODUCTION = (
@@ -120,30 +88,6 @@ DOWN_SAMPLE_KEYWORDS = [
 ]
 
 
-def send_message(openai, system_prompt, prompt, base64_image, verbose=True):
-    completion = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ],
-            },
-        ],
-        # response_format={"type": "json_object"},
-    )
-    response = completion.choices[0].message
-    if verbose:
-        print("Response: ", response.content)
-    return response.content.strip(".").lower()
-
-
 def generate_instruction(
     openai: OpenAI,
     image: Image,
@@ -175,6 +119,31 @@ def generate_instruction(
     # plot actions
     plot_actions(axs[1], actions)
 
+    def send_message(openai, system_prompt, prompt, base64_image, verbose=True):
+        completion = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                },
+            ],
+            # response_format={"type": "json_object"},
+        )
+        response = completion.choices[0].message
+        if verbose:
+            print("Response: ", response.content)
+        return response.content.strip(".").lower()
+
     # draw fig on canvas and save to io buffer
     fig.tight_layout()
     fig.canvas.draw()
@@ -187,9 +156,7 @@ def generate_instruction(
     encoded_fig = base64.b64encode(fig_bytes.read()).decode("utf-8")
 
     # generate instruction from gpt-4o
-    # prompt = "List all valid directions the robot can go without collision."
     instruction = send_message(openai, system_prompt, instruction_prompt, encoded_fig)
-    # instruction = send_message(openai, system_prompt, generate_text_image_content(prompt, encode_image("test.jpg")))
     axs[1].set_title(instruction)
     fig.suptitle(str(save_path.stem), fontsize=12)
 
@@ -200,60 +167,3 @@ def generate_instruction(
     ):
         fig.savefig(save_path, dpi=300)
     plt.close()
-
-
-@draccus.wrap()
-def generate(cfg: EvalConfig) -> None:
-    # format prompt
-    system_prompt = INTRODUCTION
-    instruction_prompt = "\n".join(INSTRUCTION_TEMPLATE[cfg.instruction_type])
-    print("================ System prompt ================")
-    print(system_prompt)
-    print("============= Instruction prompt ==============")
-    print(instruction_prompt)
-    print("============= End of Prompt Format ============")
-
-    # init openai
-    openai = OpenAI()
-
-    # eval
-    traj_paths = []
-    if cfg.eval_type == EvalType.SINGLE_TRAJ:
-        traj_paths.append(cfg.data_root_dir / cfg.traj_name)
-    elif cfg.eval_type == EvalType.SINGLE_SPLIT:
-        with open(Path(cfg.data_split_dir / cfg.eval_split / "traj_names.txt")) as f:
-            traj_names = f.read().decode("utf-8").splitlines()
-        for traj_name in traj_names:
-            traj_paths.append(cfg.data_root_dir / traj_name)
-    elif cfg.eval_type == EvalType.ENTIRE_DATASET:
-        traj_paths = list(cfg.data_root_dir.iterdir())
-    else:
-        raise KeyError("Not supported evaluation type: ", cfg.eval_type)
-
-    shutil.rmtree(cfg.output_root_dir)
-    for traj_path in traj_paths:
-        steps = parse_trajectory(
-            traj_folder=traj_path,
-            image_size=cfg.image_size,
-            len_traj_pred=cfg.len_traj_pred,
-            end_slack=cfg.end_slack,
-        )
-        Path(cfg.output_root_dir / traj_path.name).mkdir(parents=True, exist_ok=True)
-        for i, step in enumerate(steps):
-            if random.random() > cfg.sample_rate:
-                continue
-            out_path = (
-                cfg.output_root_dir / traj_path.name / f"{traj_path.name}_step_{i}.jpg"
-            )
-            generate_instruction(
-                openai,
-                step["image"],
-                step["action"],
-                system_prompt,
-                instruction_prompt,
-                out_path,
-            )
-
-
-if __name__ == "__main__":
-    generate()

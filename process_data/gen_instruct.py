@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .instruct.generate import InstructType, generate_instruction
 from .instruct.template import INTRODUCTION, INSTRUCTION_TEMPLATE
-from process_data.trajectory_parser import parse_trajectory
+from process_data.process_data.parse_traj import parse_trajectory
 
 
 class EvalType(IntEnum):

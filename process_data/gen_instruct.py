@@ -7,12 +7,8 @@ from enum import IntEnum
 from openai import OpenAI
 from pathlib import Path
 
-from .instruct_generate import (
-    INTRODUCTION,
-    INSTRUCTION_TEMPLATE,
-    InstructType,
-    generate_instruction,
-)
+from .instruct.generate import InstructType, generate_instruction
+from .instruct.template import INTRODUCTION, INSTRUCTION_TEMPLATE
 from process_data.trajectory_parser import parse_trajectory
 
 

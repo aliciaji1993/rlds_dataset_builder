@@ -99,13 +99,13 @@ MAIN_DIRECTIONS_8 = [
 
 FORMATTED_ACTIONS = [
     "Pick the instruction that best describes the direction you want the robot to take, replacing the brackets:",
-    "move straight forward",
-    "move forward towards {describe the goal in sight}",
-    "move forward along {a wall or corridor}",
-    "move around {obstacle or object to avoid}",
-    "move through {a door or some frame}",
-    "take a sharp turn {to the left or right}",
-    "turn {left or right} around and backwards",
+    "move forward",
+    "move towards {describe a goal in sight}",
+    "go along {wall or corridor}",
+    "go around {obstacle or object to avoid}",
+    "go through {door or door frame}",
+    "turn {left or right}",
+    "turn around and backwards",
 ]
 
 INSTRUCTION_TEMPLATE = [

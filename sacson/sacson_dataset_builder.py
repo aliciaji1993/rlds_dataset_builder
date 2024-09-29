@@ -11,7 +11,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
-from process_data.convert_dataset import parse_trajectory
+from data_utils.convert_dataset import parse_trajectory
 
 CONFIG_FILE_PATH = "./process_data/config/dataset_config.yaml"
 ENCODER_PATH = (

@@ -8,7 +8,7 @@ import yaml
 import rosbag
 
 # utils
-from process_data.utils.process_bags_utils import *
+from process_data.process_bags.process_bags_utils import *
 
 
 def main(args: argparse.Namespace):

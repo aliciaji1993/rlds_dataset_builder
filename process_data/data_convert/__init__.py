@@ -1,1 +1,1 @@
-from parse_trajectory import parse_trajectory
+from .parse_trajectory import parse_trajectory

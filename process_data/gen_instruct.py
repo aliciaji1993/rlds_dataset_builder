@@ -7,9 +7,10 @@ from enum import IntEnum
 from openai import OpenAI
 from pathlib import Path
 
-from .instruct_gen.generate import InstructType, generate_instruction
-from .instruct_gen.template import INTRODUCTION, INSTRUCTION_TEMPLATE
-from process_data.data_convert import parse_trajectory
+from instruct_gen.generate import InstructType, generate_instruction
+from instruct_gen.template import INTRODUCTION, INSTRUCTION_TEMPLATES
+from instruct_gen.chat_wrapper import *
+from data_convert import parse_trajectory
 
 
 class EvalType(IntEnum):
@@ -20,12 +21,15 @@ class EvalType(IntEnum):
 
 @dataclass
 class EvalConfig:
-    # eval settings
+    # generation model settings
+    chat_type: str = "vlm"
+    model_name: str = "prism-dinosiglip+7b"
+    hf_token: str = Path("/home/yufeng/.hf_token_llama").read_text().strip()
     instruction_type: InstructType = InstructType.MAIN_DIRECTIONS_4
-    eval_type: EvalType = EvalType.ENTIRE_DATASET
-    eval_split: str = "test"
 
-    # ground truth data directory, trajectory name & step for eval
+    # dataset settings
+    data_type: EvalType = EvalType.ENTIRE_DATASET
+    data_split: str = "test"
     data_split_dir = Path("/media/yufeng/nomad_dataset/data_splits/sacson/")
     data_root_dir = Path("/media/yufeng/nomad_dataset/sacson")
     traj_name: str = "Dec-12-2022-bww8_00000034_1"
@@ -44,26 +48,33 @@ class EvalConfig:
 def generate(cfg: EvalConfig) -> None:
     # format prompt
     system_prompt = INTRODUCTION
-    instruction_prompt = "\n".join(INSTRUCTION_TEMPLATE[cfg.instruction_type])
+    instruction_prompt = "\n".join(INSTRUCTION_TEMPLATES[cfg.instruction_type])
     print("================ System prompt ================")
     print(system_prompt)
     print("============= Instruction prompt ==============")
     print(instruction_prompt)
     print("============= End of Prompt Format ============")
 
-    # init openai
-    openai = OpenAI()
+    # init chat
+    if cfg.chat_type == "gpt":
+        chat = ChatGPT(system_prompt=system_prompt)
+    elif cfg.chat_type == "vlm":
+        chat = ChatVLM(
+            model_name=cfg.model_name,
+            hf_token=cfg.hf_token,
+            system_prompt=system_prompt,
+        )
 
     # eval
     traj_paths = []
-    if cfg.eval_type == EvalType.SINGLE_TRAJ:
+    if cfg.data_type == EvalType.SINGLE_TRAJ:
         traj_paths.append(cfg.data_root_dir / cfg.traj_name)
-    elif cfg.eval_type == EvalType.SINGLE_SPLIT:
-        with open(Path(cfg.data_split_dir / cfg.eval_split / "traj_names.txt")) as f:
+    elif cfg.data_type == EvalType.SINGLE_SPLIT:
+        with open(Path(cfg.data_split_dir / cfg.data_split / "traj_names.txt")) as f:
             traj_names = f.read().decode("utf-8").splitlines()
         for traj_name in traj_names:
             traj_paths.append(cfg.data_root_dir / traj_name)
-    elif cfg.eval_type == EvalType.ENTIRE_DATASET:
+    elif cfg.data_type == EvalType.ENTIRE_DATASET:
         traj_paths = list(cfg.data_root_dir.iterdir())
     else:
         raise KeyError("Not supported evaluation type: ", cfg.eval_type)
@@ -84,7 +95,7 @@ def generate(cfg: EvalConfig) -> None:
                 cfg.output_root_dir / traj_path.name / f"{traj_path.name}_step_{i}.jpg"
             )
             generate_instruction(
-                openai,
+                chat,
                 step["image"],
                 step["action"],
                 system_prompt,

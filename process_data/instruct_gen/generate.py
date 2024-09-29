@@ -12,6 +12,8 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 
+from .chat_wrapper import ChatWrapper
+
 
 class InstructType(IntEnum):
     FREE_FORM_INSTRUCTIONS = 0
@@ -26,10 +28,9 @@ DOWN_SAMPLE_KEYWORDS = [
 
 
 def generate_instruction(
-    openai: OpenAI,
+    chat: ChatWrapper,
     image: Image,
     actions: np.ndarray,
-    system_prompt: str,
     instruction_prompt: str,
     save_path: Path,
     keyword_down_sample_rate: float = 0.05,
@@ -84,16 +85,12 @@ def generate_instruction(
     # draw fig on canvas and save to io buffer
     fig.tight_layout()
     fig.canvas.draw()
-    # fig.savefig("test.jpg", dpi=300)
-    fig_bytes = io.BytesIO()
-    fig.savefig(fig_bytes, format="jpg", dpi=300)
-
-    # convert to openai image format
-    fig_bytes.seek(0)
-    encoded_fig = base64.b64encode(fig_bytes.read()).decode("utf-8")
+    fig_image = Image.frombytes(
+        "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
+    )
 
     # generate instruction from gpt-4o
-    instruction = send_message(openai, system_prompt, instruction_prompt, encoded_fig)
+    instruction = chat.send_message(fig_image, instruction_prompt)
     axs[1].set_title(instruction)
     fig.suptitle(str(save_path.stem), fontsize=12)
 

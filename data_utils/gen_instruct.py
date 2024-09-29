@@ -9,7 +9,11 @@ from pathlib import Path
 from PIL import Image
 
 from gen_instruct.generate import InstructType, generate_instruction
-from gen_instruct.template import INTRODUCTION_OBS_ONLY, INSTRUCTION_TEMPLATES
+from gen_instruct.template import (
+    INTRO_OBS_ONLY,
+    INTRO_OBS_AND_ACTION_MAP,
+    INSTRUCT_TEMPLATES,
+)
 from gen_instruct.chat_wrapper import *
 from convert_dataset import parse_trajectory
 
@@ -23,10 +27,11 @@ class EvalType(IntEnum):
 @dataclass
 class EvalConfig:
     # generation model settings
-    chat_type: str = "vlm"
-    model_name: str = "prism-dinosiglip+7b"
+    chat_type: str = "vlm"  # or "gpt"
+    model_name: str = "prism-dinosiglip+7b"  # or "gpt-4o"
     hf_token: str = Path("/home/yufeng/.hf_token_llama").read_text().strip()
-    instruction_type: InstructType = InstructType.FORMATTED_ACTIONS
+    instruction_type: InstructType = InstructType.FORMAT_ACTION
+    action_as_text: bool = True
 
     # dataset settings
     data_type: EvalType = EvalType.ENTIRE_DATASET
@@ -48,8 +53,8 @@ class EvalConfig:
 @draccus.wrap()
 def generate(cfg: EvalConfig) -> None:
     # format prompt
-    system_prompt = INTRODUCTION_OBS_ONLY
-    instruction_prompt = "\n".join(INSTRUCTION_TEMPLATES[cfg.instruction_type])
+    system_prompt = INTRO_OBS_ONLY if cfg.action_as_text else INTRO_OBS_AND_ACTION_MAP
+    instruction_prompt = "\n".join(INSTRUCT_TEMPLATES[cfg.instruction_type])
     print("================ System prompt ================")
     print(system_prompt)
     print("============= Instruction prompt ==============")
@@ -84,6 +89,7 @@ def generate(cfg: EvalConfig) -> None:
     shutil.rmtree(cfg.output_root_dir)
 
     # generate instructions
+    random.shuffle(traj_paths)
     for traj_path in traj_paths:
         steps = parse_trajectory(
             traj_folder=traj_path,
@@ -95,15 +101,16 @@ def generate(cfg: EvalConfig) -> None:
         for i, step in enumerate(steps):
             if random.random() > cfg.sample_rate:
                 continue
-            out_path = Path(
+            save_path = Path(
                 cfg.output_root_dir / traj_path.name / f"{traj_path.name}_step_{i}.jpg"
             )
             generate_instruction(
                 chat=chat,
-                image=Image.fromarray(step["image"]),
+                image=step["image"],
                 actions=step["action"],
                 instruction_prompt=instruction_prompt,
-                out_path=out_path,
+                action_as_text=cfg.action_as_text,
+                save_path=save_path,
             )
 
 

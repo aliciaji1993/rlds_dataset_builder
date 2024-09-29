@@ -1,4 +1,4 @@
-INTRODUCTION_WITH_TRAJMAP = (
+INTRO_OBS_AND_ACTION_MAP = (
     "Imagine you are providing natural language instructions to guide a robot in an indoor environment. "
     "On the left side, you will see an image showing the robot’s current view, and on the right side, "
     "an image of a 2D map representing the movement you want the robot to perform, starting at the "
@@ -14,22 +14,29 @@ INTRODUCTION_WITH_TRAJMAP = (
     "direction from others. \n"
 )
 
-INTRODUCTION_OBS_ONLY = (
+INTRO_OBS_ONLY = (
     "Imagine you are providing natural language instructions to guide a robot in an indoor environment. "
-    "You will be given an image showing the current view, and a list of 8 of actions representing the "
-    "movement you want the robot to execute. Each action represents a point in [x, y] coordinate system "
-    "in the current view, with positive x values indicates points in the front and negative x-axis "
-    "indicates points in the back, positive y values indiactes points to your left, and negative y values"
-    "indicates points to your right. The coordinates are measured in meters. \n"
+    "You will be given an image showing the current view, and a list of 8 of locations representing the "
+    "movement you want the robot to execute. Each location corresponds to a point in [x, y] coordinate "
+    "system within the current view. \n "
+    "The x axis represents the vertical direction: positive values indicate distance in meters ahead, "
+    "while negative values indicate distance behind. The y-axis represents the horizontal direction: "
+    "positive values indicate distance to the left, and negative values indicate distance to the right.\n"
+    "To answer the quesion: First, determine the general direction of the actions (e.g., forward, left, "
+    "right, or backward). Next, identify where the end position aligns within the current view to "
+    "understand where the movement is headed. Finally, decide on the best way to describe the direction. "
     "IMPORTANT:\n"
-    "1.	Ensure your instruction is precise and unambiguous. When you refer to any object in sight, make "
-    "sure with only one object matches your description. Do not halluciate nor make up objects that you "
-    "can not see in your current view.\n"
-    "2.	If multiple valid directions are visible, clarify your instruction to distinguish the intended "
-    "direction from others. \n"
+    "1.	Be succinct and answer questions directly with one of the given options.\n"
+    "2.	Ensure your instruction is precise and unambiguous. When you refer to any object in sight, make "
+    "sure only one object matches your description. Do not halluciate nor make up objects that are not"
+    "in your current view.\n"
+    "3.	Do not confuse doors with hallways. A Hallway has no barrier to open or close, and the passage is "
+    "long, extending deeper into another area. A door would have a frame and a handle you could physically"
+    "interact with. Specifically, you can enter a door into a room when you are in the hallway or exit a "
+    "door when you are inside a room. \n"
 )
 
-FREE_FORM_INSTRUCTIONS = [
+FREE_FORM = [
     "Describe the trajectory using natural language. Example instructions:",
     "Example 1. make a sharp right turn to turn away from the wall.",
     "Example 2. Turn slightly to the right, continue curving to the right into the hallway.",
@@ -38,16 +45,14 @@ FREE_FORM_INSTRUCTIONS = [
     "Example 5. Move a few steps forward, then curve to the right.",
 ]
 
-MAIN_DIRECTIONS_4 = [
-    "Pick the instruction that best describes the direction you want the robot to take:",
+MAIN_DIRECT_4 = [
     "take a left turn",
     "take a right turn",
     "move forward",
     "move backward",
 ]
 
-MAIN_DIRECTIONS_8 = [
-    "Pick the instruction that best describes the direction you want the robot to take:",
+MAIN_DIRECT_8 = [
     "turn left",
     "turn right",
     "move forward",
@@ -58,20 +63,20 @@ MAIN_DIRECTIONS_8 = [
     "move backward-right",
 ]
 
-FORMATTED_ACTIONS = [
-    "Pick the instruction that best describes the direction you want the robot to take, replacing the brackets:",
+FORMAT_ACTION = [
     "move forward",
     "move towards {describe a goal in sight}",
-    "go along {wall or corridor}",
-    "go around {obstacle or object to avoid}",
-    "go through {door or door frame}",
-    "turn {left or right}",
-    "turn around and backwards",
+    "take a {left or right} turn",
+    "go around and backwards",
+    "go along {describe the wall or corridor}",
+    # "follow {a path or trajectory}",
+    "go around {describe a obstacle or object to avoid}",
+    "{enter or exit} {a door}",
 ]
 
-INSTRUCTION_TEMPLATES = [
-    FREE_FORM_INSTRUCTIONS,
-    MAIN_DIRECTIONS_4,
-    MAIN_DIRECTIONS_8,
-    FORMATTED_ACTIONS,
+INSTRUCT_TEMPLATES = [
+    FREE_FORM,
+    MAIN_DIRECT_4,
+    MAIN_DIRECT_8,
+    FORMAT_ACTION,
 ]

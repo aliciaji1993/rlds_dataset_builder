@@ -1,4 +1,4 @@
-INTRODUCTION = (
+INTRODUCTION_WITH_TRAJMAP = (
     "Imagine you are providing natural language instructions to guide a robot in an indoor environment. "
     "On the left side, you will see an image showing the robot’s current view, and on the right side, "
     "an image of a 2D map representing the movement you want the robot to perform, starting at the "
@@ -11,6 +11,21 @@ INTRODUCTION = (
     "2.	Ensure your instruction is concise and unambiguous, with only one object or goal that matches "
     "your description. Do not halluciate nor make up objects in your sight.\n"
     "3.	If multiple valid directions are visible, clarify your instruction to distinguish the intended "
+    "direction from others. \n"
+)
+
+INTRODUCTION_OBS_ONLY = (
+    "Imagine you are providing natural language instructions to guide a robot in an indoor environment. "
+    "You will be given an image showing the current view, and a list of 8 of actions representing the "
+    "movement you want the robot to execute. Each action represents a point in [x, y] coordinate system "
+    "in the current view, with positive x values indicates points in the front and negative x-axis "
+    "indicates points in the back, positive y values indiactes points to your left, and negative y values"
+    "indicates points to your right. The coordinates are measured in meters. \n"
+    "IMPORTANT:\n"
+    "1.	Ensure your instruction is precise and unambiguous. When you refer to any object in sight, make "
+    "sure with only one object matches your description. Do not halluciate nor make up objects that you "
+    "can not see in your current view.\n"
+    "2.	If multiple valid directions are visible, clarify your instruction to distinguish the intended "
     "direction from others. \n"
 )
 

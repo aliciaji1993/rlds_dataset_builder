@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from enum import IntEnum
 from openai import OpenAI
 from pathlib import Path
+from PIL import Image
 
 from gen_instruct.generate import InstructType, generate_instruction
-from gen_instruct.template import INTRODUCTION, INSTRUCTION_TEMPLATES
+from gen_instruct.template import INTRODUCTION_OBS_ONLY, INSTRUCTION_TEMPLATES
 from gen_instruct.chat_wrapper import *
 from convert_dataset import parse_trajectory
 
@@ -25,7 +26,7 @@ class EvalConfig:
     chat_type: str = "vlm"
     model_name: str = "prism-dinosiglip+7b"
     hf_token: str = Path("/home/yufeng/.hf_token_llama").read_text().strip()
-    instruction_type: InstructType = InstructType.MAIN_DIRECTIONS_4
+    instruction_type: InstructType = InstructType.FORMATTED_ACTIONS
 
     # dataset settings
     data_type: EvalType = EvalType.ENTIRE_DATASET
@@ -47,7 +48,7 @@ class EvalConfig:
 @draccus.wrap()
 def generate(cfg: EvalConfig) -> None:
     # format prompt
-    system_prompt = INTRODUCTION
+    system_prompt = INTRODUCTION_OBS_ONLY
     instruction_prompt = "\n".join(INSTRUCTION_TEMPLATES[cfg.instruction_type])
     print("================ System prompt ================")
     print(system_prompt)
@@ -65,13 +66,13 @@ def generate(cfg: EvalConfig) -> None:
             system_prompt=system_prompt,
         )
 
-    # eval
+    # load traj paths
     traj_paths = []
     if cfg.data_type == EvalType.SINGLE_TRAJ:
         traj_paths.append(cfg.data_root_dir / cfg.traj_name)
     elif cfg.data_type == EvalType.SINGLE_SPLIT:
         with open(Path(cfg.data_split_dir / cfg.data_split / "traj_names.txt")) as f:
-            traj_names = f.read().decode("utf-8").splitlines()
+            traj_names = f.read().splitlines()
         for traj_name in traj_names:
             traj_paths.append(cfg.data_root_dir / traj_name)
     elif cfg.data_type == EvalType.ENTIRE_DATASET:
@@ -79,7 +80,10 @@ def generate(cfg: EvalConfig) -> None:
     else:
         raise KeyError("Not supported evaluation type: ", cfg.eval_type)
 
+    # clear output root
     shutil.rmtree(cfg.output_root_dir)
+
+    # generate instructions
     for traj_path in traj_paths:
         steps = parse_trajectory(
             traj_folder=traj_path,
@@ -91,16 +95,15 @@ def generate(cfg: EvalConfig) -> None:
         for i, step in enumerate(steps):
             if random.random() > cfg.sample_rate:
                 continue
-            out_path = (
+            out_path = Path(
                 cfg.output_root_dir / traj_path.name / f"{traj_path.name}_step_{i}.jpg"
             )
             generate_instruction(
-                chat,
-                step["image"],
-                step["action"],
-                system_prompt,
-                instruction_prompt,
-                out_path,
+                chat=chat,
+                image=Image.fromarray(step["image"]),
+                actions=step["action"],
+                instruction_prompt=instruction_prompt,
+                out_path=out_path,
             )
 
 

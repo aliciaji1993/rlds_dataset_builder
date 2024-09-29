@@ -4,7 +4,7 @@ import cv2
 import os
 import yaml
 
-from process_data.data_convert import parse_trajectory
+from process_data.convert_dataset import parse_trajectory
 
 CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
 

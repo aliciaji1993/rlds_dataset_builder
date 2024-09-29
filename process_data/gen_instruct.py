@@ -7,10 +7,10 @@ from enum import IntEnum
 from openai import OpenAI
 from pathlib import Path
 
-from instruct_gen.generate import InstructType, generate_instruction
-from instruct_gen.template import INTRODUCTION, INSTRUCTION_TEMPLATES
-from instruct_gen.chat_wrapper import *
-from data_convert import parse_trajectory
+from gen_instruct.generate import InstructType, generate_instruction
+from gen_instruct.template import INTRODUCTION, INSTRUCTION_TEMPLATES
+from gen_instruct.chat_wrapper import *
+from convert_dataset import parse_trajectory
 
 
 class EvalType(IntEnum):

@@ -12,7 +12,9 @@ def parse_trajectory(traj_folder, image_size, len_traj_pred, end_slack):
         traj_data = pickle.load(f)
     traj_len = len(traj_data["position"]) - end_slack - len_traj_pred
 
-    steps = []
+    images = []
+    actions = []
+    states = []
     for i in range(0, traj_len):
         # load image
         image_path = os.path.join(traj_folder, f"{i}.jpg")
@@ -32,6 +34,8 @@ def parse_trajectory(traj_folder, image_size, len_traj_pred, end_slack):
         state = np.concatenate([positions, yaws.reshape(-1, 1)], -1)[0]
 
         # append image, position, yaw and action to data list
-        steps.append(dict(image=image, state=state, action=action))
+        images.append(image)
+        actions.append(action)
+        states.append(state)
 
-    return steps
+    return dict(images=images, actions=actions, states=states)

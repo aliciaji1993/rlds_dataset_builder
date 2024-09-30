@@ -1,4 +1,5 @@
 import draccus
+import prettyprinter as pp
 import random
 import shutil
 
@@ -8,12 +9,10 @@ from openai import OpenAI
 from pathlib import Path
 from PIL import Image
 
-from gen_instruct.generate import InstructType, generate_instruction
-from gen_instruct.template import (
-    INTRO_OBS_ONLY,
-    INTRO_OBS_AND_ACTION_MAP,
-    INSTRUCT_TEMPLATES,
-)
+from tqdm import tqdm
+
+from gen_instruct.generate import InstructType, ContextType, generate_instruction
+from gen_instruct.template import INSTRUCT_TEMPLATES, INTRO_TEMPLATES
 from gen_instruct.chat_wrapper import *
 from convert_dataset import parse_trajectory
 
@@ -31,7 +30,7 @@ class EvalConfig:
     model_name: str = "prism-dinosiglip+7b"  # or "gpt-4o"
     hf_token: str = Path("/home/yufeng/.hf_token_llama").read_text().strip()
     instruction_type: InstructType = InstructType.FORMAT_ACTION
-    action_as_text: bool = True
+    context_type: ContextType = ContextType.OBS_1_ACTIONS_STRING
 
     # dataset settings
     data_type: EvalType = EvalType.ENTIRE_DATASET
@@ -47,13 +46,15 @@ class EvalConfig:
     image_size = [96, 96]
     end_slack: int = 3
     len_traj_pred: int = 8
-    sample_rate: float = 1.0
+    sample_rate: float = 0.001
 
 
 @draccus.wrap()
 def generate(cfg: EvalConfig) -> None:
+    print("============== Generation Config ==============")
+    pp.pprint(cfg)
     # format prompt
-    system_prompt = INTRO_OBS_ONLY if cfg.action_as_text else INTRO_OBS_AND_ACTION_MAP
+    system_prompt = INTRO_TEMPLATES[cfg.context_type]
     instruction_prompt = "\n".join(INSTRUCT_TEMPLATES[cfg.instruction_type])
     print("================ System prompt ================")
     print(system_prompt)
@@ -86,32 +87,40 @@ def generate(cfg: EvalConfig) -> None:
         raise KeyError("Not supported evaluation type: ", cfg.eval_type)
 
     # clear output root
-    shutil.rmtree(cfg.output_root_dir)
+    if cfg.output_root_dir.exists():
+        shutil.rmtree(cfg.output_root_dir)
+    Path(cfg.output_root_dir).mkdir(parents=True, exist_ok=True)
 
     # generate instructions
     random.shuffle(traj_paths)
-    for traj_path in traj_paths:
+    for traj_path in tqdm(traj_paths):
         steps = parse_trajectory(
             traj_folder=traj_path,
             image_size=cfg.image_size,
             len_traj_pred=cfg.len_traj_pred,
             end_slack=cfg.end_slack,
         )
-        Path(cfg.output_root_dir / traj_path.name).mkdir(parents=True, exist_ok=True)
-        for i, step in enumerate(steps):
+        # Path(cfg.output_root_dir / traj_path.name).mkdir(parents=True, exist_ok=True)
+        for i in range(len(steps["images"])):
             if random.random() > cfg.sample_rate:
                 continue
-            save_path = Path(
-                cfg.output_root_dir / traj_path.name / f"{traj_path.name}_step_{i}.jpg"
+            save_path = Path(cfg.output_root_dir / f"{traj_path.name}_step_{i}.jpg")
+            images = (
+                steps["images"][i : i + 8]
+                if cfg.context_type is ContextType.OBS_8_ACTIONS_STRING
+                else steps["images"][i]
             )
-            generate_instruction(
-                chat=chat,
-                image=step["image"],
-                actions=step["action"],
-                instruction_prompt=instruction_prompt,
-                action_as_text=cfg.action_as_text,
-                save_path=save_path,
-            )
+            try:
+                generate_instruction(
+                    chat=chat,
+                    images=images,
+                    actions=steps["actions"][i],
+                    instruction_prompt=instruction_prompt,
+                    context_type=cfg.context_type,
+                    save_path=save_path,
+                )
+            except Exception as e:
+                print("Unexpected error:", e)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,11 @@
-import base64
-import itertools
-import io
+import json
 import numpy as np
-import random
 
 from enum import IntEnum
-
 from openai import OpenAI
 from pathlib import Path
 from PIL import Image
+from typing import Union, List
 
 import matplotlib.pyplot as plt
 
@@ -20,6 +17,12 @@ class InstructType(IntEnum):
     MAIN_DIRECT_4 = 1
     MAIN_DIRECT_8 = 2
     FORMAT_ACTION = 3
+
+
+class ContextType(IntEnum):
+    OBS_1_ACTIONS_MAP = 0
+    OBS_1_ACTIONS_STRING = 1
+    OBS_8_ACTIONS_STRING = 2
 
 
 DOWN_SAMPLE_KEYWORDS = [
@@ -44,31 +47,30 @@ def plot_actions(ax, actions, color="b"):
 
 def generate_instruction(
     chat: ChatWrapper,
-    image: np.ndarray,
+    images: Union[List[np.ndarray], np.ndarray],
     actions: np.ndarray,
     instruction_prompt: str,
-    save_path: Path,
-    action_as_text: bool = True,
-    keyword_down_sample_rate: float = 0.05,
+    context_type: ContextType,
+    save_path: Path = None,
 ):
-    fig, axs = plt.subplots(1, 2)
-
-    # show observation image
-    axs[0].imshow(image)
-    axs[0].axis("off")
-
-    # plot actions
-    plot_actions(axs[1], actions)
-    plt.figtext(
-        0.5,
-        0.0,
-        str(actions),
-        horizontalalignment="center",
-        verticalalignment="bottom",
-    )
-
-    # generate instruction from gpt-4o
-    if action_as_text:
+    # generate instruction from VLMs
+    if context_type == ContextType.OBS_1_ACTIONS_MAP:
+        # draw fig (obs + action plot) on canvas
+        fig, axs = plt.subplots(1, 2, figsize=(28, 28))
+        # show observation image
+        axs[0].imshow(images)
+        axs[0].axis("off")
+        # plot actions
+        plot_actions(axs[1], actions)
+        fig.canvas.draw()
+        obs_and_action_map = Image.frombytes(
+            "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
+        )
+        # use instruction prompt directly
+        user_prompt = instruction_prompt
+        generated_text = chat.send_message(obs_and_action_map, user_prompt)
+        plt.close()
+    else:
         # Feed action list as part of text prompt
         user_prompt = "\n".join(
             [
@@ -77,32 +79,35 @@ def generate_instruction(
                 "Pick the instruction that best describes the given actions, replacing the brackets.",
             ]
         )
-    else:
-        # draw fig (obs + action plot) on canvas and send as image to VLM
-        fig.canvas.draw()
-        image = Image.frombytes(
-            "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
+        generated_text = chat.send_message(images, user_prompt)
+
+    reasoning = json.loads(generated_text)["reasoning"]
+    instruction = json.loads(generated_text)["instruction"]
+
+    # save for debug
+    if save_path:
+        fig, axs = plt.subplots(1, 2)
+        fig.suptitle(
+            instruction,
+            horizontalalignment="center",
+            verticalalignment="top",
+            fontsize=12,
+            wrap=True,
         )
-        # use instruction prompt directly
-        user_prompt = instruction_prompt
-    instruction = chat.send_message(image, user_prompt)
-    fig.suptitle(instruction, fontsize=12)
-
-    # set generated instruction as action plot title
-
-    # save and close
-    # if not (
-    #     any([keyword in instruction for keyword in DOWN_SAMPLE_KEYWORDS])
-    #     and random.random() > keyword_down_sample_rate
-    # ):
-    fig.tight_layout()
-    plt.figtext(
-        0.5,
-        0.06,
-        str(save_path.stem),
-        horizontalalignment="center",
-        verticalalignment="bottom",
-    )
-    save_file_name = f"{save_path.stem}_{instruction}"[:MAX_FILE_NAME_CHAR]
-    fig.savefig(save_path.parent / f"{save_file_name}.jpg", dpi=300)
-    plt.close()
+        # draw fig (obs + action plot) on canvas
+        axs[0].imshow(images[0] if isinstance(images, list) else images)
+        axs[0].axis("off")
+        plot_actions(axs[1], actions)
+        plt.figtext(
+            0.0,
+            0.0,
+            reasoning,
+            wrap=True,
+            horizontalalignment="left",
+            verticalalignment="bottom",
+            fontsize=9,
+        )
+        fig.tight_layout()
+        save_file_name = f"{save_path.stem}_{instruction}"[:MAX_FILE_NAME_CHAR]
+        fig.savefig(save_path.parent / f"{save_file_name}.jpg", dpi=300)
+        plt.close()

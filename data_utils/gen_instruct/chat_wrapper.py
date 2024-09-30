@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import io
 import torch
-from typing import Union
+from typing import Union, List
 
 from abc import ABC, abstractmethod
 from PIL import Image
@@ -30,9 +30,7 @@ class ChatGPT(ChatWrapper):
         self.model_name = model_name
         self.system_prompt = system_prompt
 
-    def send_message(
-        self, image: Union[Image.Image, np.ndarray], user_prompt: str, verbose=True
-    ):
+    def _generate_image_content(self, image: Union[Image.Image, np.ndarray]):
         # convert image to BytesIO and encode in openai image format
         # image_bytes = io.BytesIO()
         # image.save(image_bytes, format="jpg", dpi=300)
@@ -42,20 +40,34 @@ class ChatGPT(ChatWrapper):
         encoded_image = cv2.imencode(".jpg", image_arr)[1]
         base64_image = base64.b64encode(encoded_image.tobytes()).decode("utf-8")
 
+        return dict(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+            },
+        )
+
+    def send_message(
+        self,
+        images: Union[Image.Image, np.ndarray, List[np.ndarray]],
+        user_prompt: str,
+        verbose=False,
+    ):
+        image_content = (
+            [self._generate_image_content(m) for m in images]
+            if isinstance(images, list)
+            else [self._generate_image_content(images)]
+        )
+
         completion = self.chat.chat.completions.create(
             model=self.model_name,
             messages=[
                 {"role": "system", "content": self.system_prompt},
                 {
                     "role": "user",
-                    "content": [
+                    "content": image_content
+                    + [
                         {"type": "text", "text": user_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            },
-                        },
                     ],
                 },
             ],
@@ -64,7 +76,7 @@ class ChatGPT(ChatWrapper):
         response = completion.choices[0].message
         if verbose:
             print("Response: ", response.content)
-        return response.content.strip(".").lower()
+        return response.content
 
 
 class ChatVLM(ChatWrapper):

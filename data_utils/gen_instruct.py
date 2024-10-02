@@ -38,10 +38,9 @@ class EvalConfig:
     data_split_dir = Path("/media/yufeng/nomad_dataset/data_splits/sacson/")
     data_root_dir = Path("/media/yufeng/nomad_dataset/sacson")
     traj_name: str = "Dec-12-2022-bww8_00000034_1"
-    step: int = 0
-    window_size: int = 1
 
     # output settings
+    save_output: bool = False
     output_root_dir = Path("/media/yufeng/openvla/instruct")
     image_size = [96, 96]
     end_slack: int = 3
@@ -52,15 +51,15 @@ class EvalConfig:
 @draccus.wrap()
 def generate(cfg: EvalConfig) -> None:
     print("============== Generation Config ==============")
-    pp.pprint(cfg)
+    pp.pprint(cfg, width=1)
     # format prompt
     system_prompt = INTRO_TEMPLATES[cfg.context_type]
-    instruction_prompt = "\n".join(INSTRUCT_TEMPLATES[cfg.instruction_type])
+    instructions = INSTRUCT_TEMPLATES[cfg.instruction_type]
     print("================ System prompt ================")
     print(system_prompt)
     print("============= Instruction prompt ==============")
-    print(instruction_prompt)
-    print("============= End of Prompt Format ============")
+    print("\n".join(instructions))
+    print("=========== End of Generation Config ==========")
 
     # init chat
     if cfg.chat_type == "gpt":
@@ -87,7 +86,7 @@ def generate(cfg: EvalConfig) -> None:
         raise KeyError("Not supported evaluation type: ", cfg.eval_type)
 
     # clear output root
-    if cfg.output_root_dir.exists():
+    if cfg.save_output and cfg.output_root_dir.exists():
         shutil.rmtree(cfg.output_root_dir)
     Path(cfg.output_root_dir).mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +103,11 @@ def generate(cfg: EvalConfig) -> None:
         for i in range(len(steps["images"])):
             if random.random() > cfg.sample_rate:
                 continue
-            save_path = Path(cfg.output_root_dir / f"{traj_path.name}_step_{i}.jpg")
+            save_path = (
+                Path(cfg.output_root_dir / f"{traj_path.name}_step_{i}.jpg")
+                if cfg.save_output
+                else None
+            )
             images = (
                 steps["images"][i : i + 8]
                 if cfg.context_type is ContextType.OBS_8_ACTIONS_STRING
@@ -115,7 +118,7 @@ def generate(cfg: EvalConfig) -> None:
                     chat=chat,
                     images=images,
                     actions=steps["actions"][i],
-                    instruction_prompt=instruction_prompt,
+                    instructions=instructions,
                     context_type=cfg.context_type,
                     save_path=save_path,
                 )

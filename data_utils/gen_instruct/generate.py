@@ -45,11 +45,38 @@ def plot_actions(ax, actions, color="b"):
     ax.set_box_aspect(aspect=1)
 
 
+def visualize_step(image, actions, instruction, reasoning, save_path):
+    fig, axs = plt.subplots(1, 2)
+    fig.suptitle(
+        instruction,
+        horizontalalignment="center",
+        verticalalignment="top",
+        fontsize=12,
+        wrap=True,
+    )
+    # draw fig (obs + action plot) on canvas
+    axs[0].imshow(image)
+    axs[0].axis("off")
+    plot_actions(axs[1], actions)
+    plt.figtext(
+        0.0,
+        0.0,
+        reasoning,
+        wrap=True,
+        horizontalalignment="left",
+        verticalalignment="bottom",
+        fontsize=9,
+    )
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=300)
+    plt.close()
+
+
 def generate_instruction(
     chat: ChatWrapper,
     images: Union[List[np.ndarray], np.ndarray],
     actions: np.ndarray,
-    instruction_prompt: str,
+    instructions: List[str],
     context_type: ContextType,
     save_path: Path = None,
 ):
@@ -66,16 +93,18 @@ def generate_instruction(
         obs_and_action_map = Image.frombytes(
             "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
         )
-        # use instruction prompt directly
-        user_prompt = instruction_prompt
+        # use instruction list as prompt directly
+        user_prompt = "\n".join(instructions)
         generated_text = chat.send_message(obs_and_action_map, user_prompt)
         plt.close()
     else:
-        # Feed action list as part of text prompt
+        # Feed action list and instruction list as text prompt
         user_prompt = "\n".join(
             [
                 f"Given list of actions: {actions}",
-                instruction_prompt,
+            ]
+            + instructions
+            + [
                 "Pick the instruction that best describes the given actions, replacing the brackets.",
             ]
         )
@@ -86,28 +115,9 @@ def generate_instruction(
 
     # save for debug
     if save_path:
-        fig, axs = plt.subplots(1, 2)
-        fig.suptitle(
-            instruction,
-            horizontalalignment="center",
-            verticalalignment="top",
-            fontsize=12,
-            wrap=True,
-        )
-        # draw fig (obs + action plot) on canvas
-        axs[0].imshow(images[0] if isinstance(images, list) else images)
-        axs[0].axis("off")
-        plot_actions(axs[1], actions)
-        plt.figtext(
-            0.0,
-            0.0,
-            reasoning,
-            wrap=True,
-            horizontalalignment="left",
-            verticalalignment="bottom",
-            fontsize=9,
-        )
-        fig.tight_layout()
+        image = images[0] if isinstance(images, list) else images
         save_file_name = f"{save_path.stem}_{instruction}"[:MAX_FILE_NAME_CHAR]
-        fig.savefig(save_path.parent / f"{save_file_name}.jpg", dpi=300)
-        plt.close()
+        save_path = save_path.parent / f"{save_file_name}.jpg"
+        visualize_step(image, actions, instruction, reasoning, save_path)
+
+    return dict(reasoning=reasoning, instruction=instruction)

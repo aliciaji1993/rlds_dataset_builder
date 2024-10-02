@@ -22,10 +22,11 @@ INTRO_OBS_AND_ACTION_STRING = (
     "The x axis represents the vertical direction: positive values indicate distance in meters ahead, "
     "while negative values indicate distance behind. The y-axis represents the horizontal direction: "
     "positive values indicate distance to the left, and negative values indicate distance to the right.\n"
-    "Think step in step: First, review the list of locations to determine the overall direction (e.g., "
-    "forward, left, right, or backward). Then, check the final location to see where it aligns with the "
-    "image observation to understand the movement's target. Finally, decide how best to describe the "
-    "trajectory.\n"
+    "Think step by step: First, review the list of locations to identify the overall direction (e.g., "
+    "forward, left, right, or backward). Then, check the coordinates of the final step to see where it "
+    "aligns in the current view and understand the movement’s target. Double-check the target’s location "
+    "in the view, its relative position (front, left, right), and confirm this matches the coordinates "
+    "of the final step to avoid errors. Finally, determine the best way to describe the trajectory.\n"
     "IMPORTANT:\n"
     "1.	Be succinct and answer questions directly with one of the given options.\n"
     "2.	Ensure your instruction is precise and unambiguous. When you refer to any object in sight, make "
@@ -35,8 +36,12 @@ INTRO_OBS_AND_ACTION_STRING = (
     "long, extending deeper into another area. A door would have a frame and a handle you could physically "
     "interact with. Specifically, you can enter a door into a room when you are in the hallway or exit a "
     "door when you are inside a room. \n"
-    "4.	Do not confuse left and right direction! The y axis decides whether you are moving to the left "
-    "(positive) or to the right (negative).\n"
+    "4.	Do not confuse left and right direction! In mose cases, y value of the last few steps determines the "
+    "direction of moving. Positive y values indicate you are moving to the left (positive y = left), "
+    "while negative y values indicate movements to the right (negative y = right).\n"
+    "5.	Pay close attention to trajectories with increasingly negative x values, as these typically "
+    "occur in backward turning movements. In such cases, the turning direction is determined by the "
+    "initial steps rather than the final steps of the trajectory. \n"
     "Response Format:\n"
     "{\n"
     '    "reasoning": "{think step in step}",\n'
@@ -54,10 +59,11 @@ INTRO_8_OBS_AND_ACTION_STRING = (
     "while negative values indicate distance behind. The y-axis represents the horizontal direction: "
     "positive values indicate distance to the left, and negative values to the right.\n"
     "Finally, decide how best to describe the trajectory.\n"
-    "Think step in step: First, review the list of locations to determine the overall direction (e.g., "
-    "forward, left, right, or backward). Then, check the final location to see where it aligns with the "
-    "image observation to understand the movement's target. Finally, decide how best to describe the "
-    "trajectory.},\n"
+    "Think step by step: First, review the list of locations to identify the overall direction (e.g., "
+    "forward, left, right, or backward). Then, check the coordinates of the final step to see where it "
+    "aligns in the current view and understand the movement’s target. Double-check the target’s location "
+    "in the view, its relative position (front, left, right), and confirm this matches the coordinates "
+    "of the final step to avoid errors. Finally, determine the best way to describe the trajectory.\n"
     "IMPORTANT:\n"
     "1.	Be succinct and answer questions in one phrase.\n"
     "2.	Ensure your instruction is precise and unambiguous. When you refer to any object in sight, make "
@@ -67,8 +73,12 @@ INTRO_8_OBS_AND_ACTION_STRING = (
     "long, extending deeper into another area. A door would have a frame and a handle you could physically "
     "interact with. Specifically, you can enter a door into a room when you are in the hallway or exit a "
     "door when you are inside a room. \n"
-    "4.	Do not confuse left and right direction! The y axis decides whether you are moving to the left "
-    "(positive) or to the right (negative).\n"
+    "4.	Do not confuse left and right direction! In mose cases, y value of the last few steps determines the "
+    "direction of moving. Positive y values indicate you are moving to the left (positive y = left), "
+    "while negative y values indicate movements to the right (negative y = right).\n"
+    "5. Pay close attention to trajectories with increasingly negative x values, as these typically "
+    "occur in backward turning movements. In such cases, the turning direction is determined by the "
+    "initial steps rather than the final steps of the trajectory. \n"
     "Response Format:\n"
     "{\n"
     '    "reasoning": "{think step in step}",\n'
@@ -106,12 +116,12 @@ MAIN_DIRECT_8 = [
 
 FORMAT_ACTION = [
     "move {left, right, foward}",
-    "move {left, right} towards {describe the goal destination}",
+    "move {left, right} towards {describe the target destination}",
     "take a {left, right} turn",
     "turn around and backwards",
     "go along {describe the wall or corridor}",
     "go around {describe the obstacle}",
-    "{enter or exit} {describe the door go through}",
+    "{enter or exit} {describe the door to go through}",
 ]
 
 INSTRUCT_TEMPLATES = [

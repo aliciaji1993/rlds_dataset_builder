@@ -25,11 +25,19 @@ class ContextType(IntEnum):
     OBS_8_ACTIONS_STRING = 2
 
 
+class ReasoningType(IntEnum):
+    REASON_BY_ACTIONS = 0
+    REASON_BY_SCENES = 1
+    REASON_BY_STEPS = 2
+
+
 DOWN_SAMPLE_KEYWORDS = [
     "move forward",
 ]
 
 MAX_FILE_NAME_CHAR = 255
+
+DEFAULT_INSTRUCTION = "continue the trajectory"
 
 
 def plot_actions(ax, actions, color="b"):
@@ -65,7 +73,7 @@ def visualize_step(image, actions, instruction, reasoning, save_path):
         wrap=True,
         horizontalalignment="left",
         verticalalignment="bottom",
-        fontsize=9,
+        fontsize=6,
     )
     fig.tight_layout()
     fig.savefig(save_path, dpi=300)
@@ -76,9 +84,10 @@ def generate_instruction(
     chat: ChatWrapper,
     images: Union[List[np.ndarray], np.ndarray],
     actions: np.ndarray,
-    instructions: List[str],
+    generation_prompt: List[str],
     context_type: ContextType,
     save_path: Path = None,
+    num_retries: int = 5,
 ):
     # generate instruction from VLMs
     if context_type == ContextType.OBS_1_ACTIONS_MAP:
@@ -94,24 +103,35 @@ def generate_instruction(
             "RGB", fig.canvas.get_width_height(), fig.canvas.tostring_rgb()
         )
         # use instruction list as prompt directly
-        user_prompt = "\n".join(instructions)
+        user_prompt = generation_prompt
         generated_text = chat.send_message(obs_and_action_map, user_prompt)
         plt.close()
     else:
         # Feed action list and instruction list as text prompt
-        user_prompt = "\n".join(
-            [
-                f"Given list of actions: {actions}",
-            ]
-            + instructions
-            + [
-                "Pick the instruction that best describes the given actions, replacing the brackets.",
-            ]
+        y_mirrored_actions = actions * np.array([0, -1] * actions.shape[0]).reshape(
+            actions.shape
         )
-        generated_text = chat.send_message(images, user_prompt)
-
-    reasoning = json.loads(generated_text)["reasoning"]
-    instruction = json.loads(generated_text)["instruction"]
+        user_prompt = (
+            f"Given list of actions: {y_mirrored_actions}\n" + generation_prompt
+        )
+        num_tries = 0
+        stop = False
+        while num_tries < num_retries and not stop:
+            try:
+                bgr_images = (
+                    [image[:, :, ::-1] for image in images]
+                    if isinstance(images, list)
+                    else images[:, :, ::-1]
+                )
+                generated_text = chat.send_message(bgr_images, user_prompt)
+                reasoning = json.loads(generated_text)["reasoning"]
+                instruction = json.loads(generated_text)["instruction"]
+                stop = True
+            except Exception as e:
+                print("Exception in instruction generation: ", e)
+                if num_tries >= num_retries:
+                    return None
+                num_tries += 1
 
     # save for debug
     if save_path:

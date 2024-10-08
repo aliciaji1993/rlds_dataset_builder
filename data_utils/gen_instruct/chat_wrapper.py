@@ -8,8 +8,8 @@ from typing import Union, List
 from abc import ABC, abstractmethod
 from PIL import Image
 
-from openai import OpenAI
-from prismatic import load
+
+
 
 
 class ChatWrapper(ABC):
@@ -26,6 +26,9 @@ class ChatWrapper(ABC):
 class ChatGPT(ChatWrapper):
 
     def __init__(self, model_name: str = "gpt-4o", system_prompt: str = "") -> None:
+        # lazy import
+        from openai import OpenAI
+
         self.chat = OpenAI()
         self.model_name = model_name
         self.system_prompt = system_prompt
@@ -71,7 +74,7 @@ class ChatGPT(ChatWrapper):
                     ],
                 },
             ],
-            # response_format={"type": "json_object"},
+            response_format={"type": "json_object"},
         )
         response = completion.choices[0].message
         if verbose:
@@ -88,6 +91,9 @@ class ChatVLM(ChatWrapper):
         system_prompt: str = "",
         device: torch.DeviceObjType = torch.device("cuda"),
     ) -> None:
+        # lazy import
+        from prismatic import load
+
         self.model_name = model_name
         self.hf_token = hf_token
         self.device = device

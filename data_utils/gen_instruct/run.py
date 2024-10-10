@@ -16,13 +16,9 @@ from gen_instruct.generate import (
     InstructType,
     ContextType,
     ReasoningType,
-    generate_instruction,
-)
-from gen_instruct.template import (
-    INSTRUCT_TEMPLATES,
-    INTRO_TEMPLATES,
-    GENERATION_GUIDE,
-    RESPONSE_TEMPLATES,
+    gen_instruction,
+    gen_system_prompt,
+    gen_generation_prompt,
 )
 from gen_instruct.chat_wrapper import *
 from convert_dataset import parse_trajectory
@@ -65,14 +61,9 @@ def generate(cfg: EvalConfig) -> None:
     print("============== Generation Config ==============")
     pp.pprint(cfg, width=1)
     # format prompt
-    system_prompt = (
-        INTRO_TEMPLATES[cfg.context_type]
-        + GENERATION_GUIDE
-        + RESPONSE_TEMPLATES[cfg.reasoning_type]
-    )
-    generation_prompt = "Examples:\n" + "\n".join(
-        INSTRUCT_TEMPLATES[cfg.instruction_type]
-    )
+    system_prompt = gen_system_prompt(cfg.context_type, cfg.reasoning_type)
+    generation_prompt = gen_generation_prompt(cfg.instruction_type)
+
     print("================ System prompt ================")
     print(system_prompt)
     print("============= Instruction prompt ==============")
@@ -132,7 +123,7 @@ def generate(cfg: EvalConfig) -> None:
                 else steps["images"][i]
             )
             # generate instruction
-            response = generate_instruction(
+            response = gen_instruction(
                 chat=chat,
                 images=images,
                 actions=steps["actions"][i],

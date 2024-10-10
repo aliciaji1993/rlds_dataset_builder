@@ -16,7 +16,10 @@ from data_utils.gen_instruct.chat_wrapper import ChatGPT
 from data_utils.gen_instruct.generate import (
     InstructType,
     ContextType,
-    generate_instruction,
+    ReasoningType,
+    gen_generation_prompt,
+    gen_system_prompt,
+    gen_instruction,
 )
 from data_utils.gen_instruct.template import INSTRUCT_TEMPLATES, INTRO_TEMPLATES
 
@@ -55,10 +58,12 @@ class RLDSDatasetBuilder(tfds.core.GeneratorBasedBuilder):
         self._embed = hub.load(ENCODER_PATH)
 
         # language instruction generation
-        self.context_type = ContextType.OBS_1_ACTIONS_STRING
-        self.instruction_type = InstructType.FORMAT_ACTION
-        self.instructions = INSTRUCT_TEMPLATES[self.instruction_type]
-        self.chat = ChatGPT(system_prompt=INTRO_TEMPLATES[self.context_type])
+        self.instruction_type: InstructType = InstructType.FORMAT_ACTION
+        self.context_type: ContextType = ContextType.OBS_1_ACTIONS_STRING
+        self.reasoning_type: ReasoningType = ReasoningType.REASON_BY_STEPS
+        self.generation_prompt = gen_generation_prompt(self.instruction_type)
+        self.system_prompt = gen_system_prompt(self.context_type, self.reasoning_type)
+        self.chat = ChatGPT(system_prompt=self.system_prompt)
 
         # dataset configs
         with open(CONFIG_FILE_PATH, "r") as f:
@@ -167,11 +172,11 @@ class RLDSDatasetBuilder(tfds.core.GeneratorBasedBuilder):
             traj_len = len(traj["images"])
             for i in range(traj_len):
                 try:
-                    response = generate_instruction(
+                    response = gen_instruction(
                         chat=self.chat,
                         images=traj["images"][i],
                         actions=traj["actions"][i],
-                        instructions=self.instructions,
+                        generation_prompt=self.generation_prompt,
                         context_type=self.context_type,
                     )
                     # compute lanuage embedding

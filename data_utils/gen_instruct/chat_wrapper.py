@@ -2,14 +2,15 @@ import base64
 import cv2
 import numpy as np
 import io
+import os
 import torch
 from typing import Union, List
 
 from abc import ABC, abstractmethod
 from PIL import Image
 
-
-
+os.environ["OPENAI_API_VERSION"] = "2024-08-01-preview"
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://openvla.openai.azure.com/"
 
 
 class ChatWrapper(ABC):
@@ -27,9 +28,9 @@ class ChatGPT(ChatWrapper):
 
     def __init__(self, model_name: str = "gpt-4o", system_prompt: str = "") -> None:
         # lazy import
-        from openai import OpenAI
+        from openai import AzureOpenAI
 
-        self.chat = OpenAI()
+        self.chat = AzureOpenAI()
         self.model_name = model_name
         self.system_prompt = system_prompt
 

@@ -4,9 +4,11 @@ import cv2
 import os
 import yaml
 
-from process_data.convert_dataset import parse_trajectory
+from data_utils.convert_dataset import parse_trajectory
 
-CONFIG_FILE_PATH = "/home/yufeng/rlds_dataset_builder/config/nomad.yaml"
+CONFIG_FILE_PATH = (
+    "/home/yufeng/rlds_dataset_builder/data_utils/config/dataset_config.yaml"
+)
 
 
 def main():
@@ -14,7 +16,7 @@ def main():
         config = yaml.safe_load(f)
 
     # load data config
-    data_config = config["datasets"]["sacson"]
+    data_config = config["datasets"]["homebot_v2"]
 
     # load data config details
     data_folder = data_config["data_folder"]

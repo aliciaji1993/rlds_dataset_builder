@@ -111,6 +111,20 @@ datasets:
   #   end_slack: 0
   #   goals_per_obs: 1
   #   negative_mining: True
+  homebot:
+    data_folder: /media/yufeng/nomad_dataset/homebot/
+    train: /media/yufeng/nomad_dataset/data_splits/homebot/train/
+    test: /media/yufeng/nomad_dataset/data_splits/homebot/test/
+    end_slack: 3 # because many trajectories end in collisions
+    goals_per_obs: 1
+    negative_mining: True
+  homebot_v2:
+    data_folder: /media/yufeng/nomad_dataset/homebot_v2/
+    train: /media/yufeng/nomad_dataset/data_splits/homebot_v2/train/
+    test: /media/yufeng/nomad_dataset/data_splits/homebot_v2/test/
+    end_slack: 3 # because many trajectories end in collisions
+    goals_per_obs: 1
+    negative_mining: True
 
 # logging stuff
 ## =0 turns off

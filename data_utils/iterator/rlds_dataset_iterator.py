@@ -13,15 +13,16 @@ from pathlib import Path
 
 from data_utils.gen_instruct.generate import visualize_step
 
+
 @dataclass
 class IterateConfig:
-    dataset_folder: str = Path("/media/yufeng/tensorflow_datasets/sacson/2.0.0")
-    visualize_dataset: bool = False
+    dataset_folder: str = Path("/media/yufeng/tensorflow_datasets/homebot_v2/3.0.0")
+    visualize_dataset: bool = True
     output_root: str = Path("./output")
 
 
 @draccus.wrap()
-def generate(cfg: IterateConfig) -> None:
+def iterate_dataset(cfg: IterateConfig) -> None:
     # load tensorflow dataset
     dataset_folder = Path(cfg.dataset_folder)
     tfrecords = glob.glob(f"{dataset_folder}/*.tfrecord*")
@@ -50,11 +51,13 @@ def generate(cfg: IterateConfig) -> None:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # get images list
-        images = example.features.feature.get("steps/observation/image").bytes_list.value
+        images = example.features.feature.get(
+            "steps/observation/image"
+        ).bytes_list.value
         if len(images) == 0:
             num_empty_traj += 1
             continue
-        num_steps += len(images) 
+        num_steps += len(images)
 
         # get actions list
         actions = example.features.feature.get("steps/action").float_list.value
@@ -78,7 +81,7 @@ def generate(cfg: IterateConfig) -> None:
             # convert to numpy and inspect image size
             image_array = np.asarray(image)
             assert image_array.shape == (96, 96, 3)
-            
+
             if instructions[step].decode("utf-8") == "continue the trajectory":
                 # print(f"default instruction found at {traj_path} step {step}")
                 num_default_instruct += 1
@@ -93,7 +96,12 @@ def generate(cfg: IterateConfig) -> None:
                     save_path=output_dir / f"step_{step}.jpg",
                 )
 
-    print(f"Out of total {i+1} records, total steps {num_steps}: \n"
+    print(
+        f"Out of total {i+1} records, total steps {num_steps}: \n"
         f"{num_empty_traj} empty records and "
-        f"{num_default_instruct} default instructions")
+        f"{num_default_instruct} default instructions"
+    )
 
+
+if __name__ == "__main__":
+    iterate_dataset()
